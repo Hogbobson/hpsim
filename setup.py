@@ -9,10 +9,11 @@ Created on Mon May 27 15:53:45 2019
 from setuptools import setup, find_packages
 
 setup(name='hpsim',
-      version='0.3.2',
+      version='0.1.0',
       description='An modular, high performance particle simulator',
       url='http://github.com/Hogbobson/hpsim',
       author='Mads Kildholt',
       author_email='hogbobson@gmail.com',
       license='GNU General Public License v3',
-      packages=find_packages()))
+      packages=find_packages(),
+)
