@@ -9,7 +9,7 @@ Created on Mon May 27 15:53:45 2019
 from setuptools import setup, find_packages
 
 setup(name='hpsim',
-      version='0.0.1',
+      version='0.0.2',
       description='A modular, high performance particle simulator',
       url='http://github.com/Hogbobson/hpsim',
       author='Mads Kildholt',
