@@ -6,7 +6,6 @@ Created on Wed May 29 10:10:11 2019
 @author: hogbobson
 """
 
-from hpsim.sonic import sonic
+import hpsim.sonic as wat
 
-a = sonic()
-b = sonic.results()
+wat()

@@ -55,3 +55,6 @@ class sonic:
         plot_func(everything['ensemble'])
     
         self.everything = everything
+        
+    def results(self):
+        return self.everything
