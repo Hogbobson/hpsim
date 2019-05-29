@@ -1,7 +1,7 @@
 Metadata-Version: 1.0
 Name: hpsim
-Version: 0.1.0
-Summary: An modular, high performance particle simulator
+Version: 0.0.1
+Summary: A modular, high performance particle simulator
 Home-page: http://github.com/Hogbobson/hpsim
 Author: Mads Kildholt
 Author-email: hogbobson@gmail.com

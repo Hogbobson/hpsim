@@ -7,9 +7,9 @@ Created on Tue May  7 10:52:17 2019
 
 #####_____#####     PREAMBLE     #####_____#####
 import numpy as np
-import re
-import os
-import time as tm
+#import re
+#import os
+#import time as tm
 from matplotlib import pyplot as plt
 from numpy import random as rng, linalg as LA
 from astropy import constants as astcnst
