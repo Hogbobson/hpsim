@@ -10,7 +10,9 @@ from numpy import random as rng, linalg as LA
 from astropy import constants as astcnst
 from scipy import constants as phycnst
 from math import radians as rad
+from hpsim import energy
 from hpsim.miscfuncs import distances
+
     
 class StarSystemGenerator:
     def __init__(self):
@@ -21,6 +23,8 @@ class StarSystemGenerator:
         self.v        = []
         self.vm       = []
         self.d        = []
+        self.E        = []
+        self.E_legacy = np.empty((1,0), float)
         self.e        = []
         self.i        = []
         self.m        = []
@@ -43,6 +47,8 @@ class StarSystemGenerator:
                     'velocity': self.v,
                     'velocity magnitude': self.vm,
                     'mass': self.m,
+                    'energy': self.E,
+                    'energy data': np.reshape(self.E_legacy, (self.n, 0)),
                     'number of objects': self.n,
                     'label': self.label,
                     'rem': others
@@ -58,6 +64,8 @@ class StarSystemGenerator:
         self.v        = ensemble['velocity']
         self.vm       = ensemble['velocity magnitude']
         self.d        = ensemble['distance']
+        self.E        = ensemble['energy']
+        self.E_legacy = ensemble['energy data']
         self.e        = ensemble['rem']['eccentricity']    
         self.i        = ensemble['rem']['inclination']
         self.m        = ensemble['mass']
@@ -299,6 +307,7 @@ class StarSystemGenerator:
     
     
     
+    
     #for ith_dict in generator_list:
     #    ensemble = ith_dict['function name(ensemble, ith_dict['arg)
         
@@ -311,6 +320,7 @@ def solar_system():
     SSG.velocities_with_central_star()
     
     ensemble = SSG.get_ensemble()
+    ensemble = energy.brute_kinetic_energy(ensemble)
     return ensemble
     
 def random_solar_system():
@@ -320,4 +330,5 @@ def random_solar_system():
     SSG.velocities_with_central_star()
     
     ensemble = SSG.get_ensemble()
+    ensemble = energy.brute_kinetic_energy(ensemble)
     return ensemble
