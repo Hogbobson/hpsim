@@ -18,7 +18,7 @@ from hpsim import visual
 from hpsim import energy
 
 
-def main(          ensemble_generator = ensgen.solar_system, \
+def main(          ensemble_generator = ensgen.random_solar_system, \
                    integration_func = ntgrtr.n_squared, \
                    solver_func = solver.sym2, \
                    wanted_forces = [force.gravity], \
