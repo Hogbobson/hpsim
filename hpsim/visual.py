@@ -41,31 +41,48 @@ def mkfile(data, name):
 
     
 def simple_anim(everything):
+    def update_lines(num, dataLines, lines):
+        for line, data in zip(lines, dataLines):
+            # NOTE: there is no .set_data() for 3 dim data...
+            line.set_data(data[0:2, :num])
+            line.set_3d_properties(data[2, :num])
+        return lines
+        
+        
+
+    # Attaching 3D axis to the figure
     fig = plt.figure()
     ax = p3.Axes3D(fig)
     
-    line, = ax.plot([], [], [], 'o')
-    time_template = 'time = %.1fs'
-    time_text = ax.text(0.05, 0.9, '', transform=ax.transAxes)
     
-    iteras = int(everything['current time'] / everything['dt'] + 1)
+    data = everything['ensemble']['r data']
+    numobjs = everything['ensemble']['number of objects']
+    numstps = everything['time steps']
     
-    def init():
-        line.set_data([], [], [])
-        time_text.set_text('')
-        return line, time_text
+    datalines = [data[i] for i in range(int(numobjs))]
     
     
-    def animate(i):
-        thisx = everything['ensemble']['r data'][:, 0, i]
-        thisy = everything['ensemble']['r data'][:, 1, i]
-        thisz = everything['ensemble']['r data'][:, 2, i]
+    # Creating fifty line objects.
+    # NOTE: Can't pass empty arrays into 3d version of plot()
+    lines = [ax.plot(dat[0, 0:1], dat[1, 0:1], dat[2, 0:1])[0] \
+             for dat in datalines]
     
-        line.set_data(thisx, thisy, thisz)
-        time_text.set_text(time_template % (i*everything['dt']))
-        return line, time_text
+    lim = np.max(data)
+    # Setting the axes properties
+    ax.set_xlim3d([-lim, lim])
+    ax.set_xlabel('X')
     
-    ani = anim.FuncAnimation(fig, animate, np.arange(1, iteras),
-                                  interval=25, blit=True, init_func=init)
-            
-    fig.show()
+    ax.set_ylim3d([-lim, lim])
+    ax.set_ylabel('Y')
+    
+    ax.set_zlim3d([-lim, lim])
+    ax.set_zlabel('Z')
+    
+    ax.set_title('3D Test')
+    
+    # Creating the Animation object
+    line_ani = anim.FuncAnimation(fig, update_lines, np.arange(1, numsteps), \
+                                       fargs=(datalines, lines), \
+                                       interval=25, blit=False)
+    
+    plt.show()
