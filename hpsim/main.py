@@ -50,7 +50,7 @@ def main(          ensemble_generator = ensgen.random_solar_system, \
         integrator(everything['ensemble'])
         solver(everything['ensemble'], everything['dt'], forces)
         everything['current time'] += everything['dt']
-        everything['time step'] += 1
+        everything['time steps'] += 1
         everything['ensemble']['r data'] = np.append( \
                   everything['ensemble']['r data'], 
                   np.reshape(everything['ensemble']['r'], \

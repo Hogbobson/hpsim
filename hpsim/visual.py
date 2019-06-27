@@ -41,12 +41,25 @@ def mkfile(data, name):
 
     
 def simple_anim(everything):
-    def update_lines(num, dataLines, lines):
-        for line, data in zip(lines, dataLines):
-            # NOTE: there is no .set_data() for 3 dim data...
-            line.set_data(data[0:2, :num])
-            line.set_3d_properties(data[2, :num])
-        return lines
+    def update_points(num, dataLines, ax):
+        ax.clear()
+        ax.scatter(
+                dataLines[0][0][num],
+                dataLines[0][1][num],
+                dataLines[0][2][num],
+                s=100,
+                marker='o',
+                c='yellow'
+                )
+        
+        ax.scatter(
+                dataLines[1:][0][num],
+                dataLines[1:][1][num],
+                dataLines[1:][2][num],
+                s=5,
+                marker='o',
+                c='blue'
+                )
         
         
 
@@ -60,12 +73,11 @@ def simple_anim(everything):
     numstps = everything['time steps']
     
     datalines = [data[i] for i in range(int(numobjs))]
+    print(datalines[0])
     
     
     # Creating fifty line objects.
     # NOTE: Can't pass empty arrays into 3d version of plot()
-    lines = [ax.plot(dat[0, 0:1], dat[1, 0:1], dat[2, 0:1])[0] \
-             for dat in datalines]
     
     lim = np.max(data)
     # Setting the axes properties
@@ -81,8 +93,9 @@ def simple_anim(everything):
     ax.set_title('3D Test')
     
     # Creating the Animation object
-    line_ani = anim.FuncAnimation(fig, update_lines, np.arange(1, numsteps), \
-                                       fargs=(datalines, lines), \
+    line_ani = anim.FuncAnimation(fig, update_points, np.arange(1,numstps), \
+                                       fargs=(datalines, ax), \
                                        interval=25, blit=False)
     
     plt.show()
+    return line_ani
