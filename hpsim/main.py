@@ -18,15 +18,17 @@ from . import visual
 from . import energy
 
 
-def main(          ensemble_generator = ensgen.random_solar_system, \
-                   integration_func = ntgrtr.n_squared, \
-                   solver_func = solver.sym2, \
-                   wanted_forces = [force.gravity], \
-                   plot_func = visual.simple_anim, \
-                   energy_func = energy.no_energy, \
-                   time_start = 0, \
-                   time_step = timestep.constant_dt(100000), \
-                   time_end = timegen.time_years(1)):
+def main(          ensemble_generator = ensgen.random_solar_system  ,
+                   integration_func = ntgrtr.n_squared              , 
+                   solver_func = solver.sym2                        , 
+                   wanted_forces = [force.gravity]                  , 
+                   plot_func = visual.simple_anim                   ,
+                   plot_save = False                                ,
+                   energy_func = energy.no_energy                   ,   
+                   time_start = 0                                   , 
+                   time_step = timestep.constant_dt(100000)         , 
+                   time_end = timegen.time_years(1)
+                   ):
 
     everything = {
             'ensemble': ensemble_generator()    ,
@@ -38,7 +40,8 @@ def main(          ensemble_generator = ensgen.random_solar_system, \
             'current time': time_start          ,
             'dt': time_step                     ,
             'time end': time_end                ,
-            'time steps': 0
+            'time steps': 0                     ,
+            'plot output': None
             }
     
     #I put everything here that isn't changed for readability.
@@ -57,6 +60,6 @@ def main(          ensemble_generator = ensgen.random_solar_system, \
                         (everything['ensemble']['number of objects'], \
                          3,1)), axis = 2)
     
-    plot_func(everything)
+    everything['plot output'] = plot_func(everything)
 
     return everything

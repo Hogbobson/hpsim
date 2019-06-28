@@ -287,8 +287,8 @@ class StarSystemGenerator:
         self.d  = distances(self.r)
         #dm             = LA.norm(self.d, axis = 2)
         self.rm = LA.norm(self.r, axis = 1)
-        theta_v = np.zeros(n)
-        theta_v[1:n] = np.pi/2 - \
+        phi_v = np.zeros(n)
+        phi_v[1:n] = np.pi/2 - \
                 np.arctan(np.abs(self.r[1:n, 1]/self.r[1:n, 0]))
         self.vm = np.zeros_like(self.m)
         self.vm[1:n] = np.sqrt(astcnst.G.value * \
@@ -297,9 +297,9 @@ class StarSystemGenerator:
         alpha = np.reshape(np.sqrt(1. - self.e**2), (n, 1))
         self.v  = np.zeros_like(self.r)
         self.v[:n,0] = -1 * np.sign(self.r[:n,1]) * \
-                        np.cos(theta_v[:n]) * self.vm[:n]
+                        np.cos(phi_v[:n]) * self.vm[:n]
         self.v[:n,1] = np.sign(self.r[:n,0]) * \
-                        np.cos(theta_v[:n]) * self.vm[:n]
+                        np.cos(phi_v[:n]) * self.vm[:n]
         self.v[:n,:] = self.v[:n,:] * alpha[:n]
         self.v[:n,2] = self.vm - LA.norm(self.v[:n,:], axis = 1)
         self.vm = LA.norm(self.v, axis = 1)

@@ -14,10 +14,11 @@ from matplotlib import animation as anim
 
     
 def no_plot(ensemble):
-    pass
+    return None
 
 
-def standard_plot(ensemble):
+def standard_plot(everything):
+    ensemble = everything['ensemble']
     n = ensemble['number of objects']
     plt.figure(num = 0, figsize = (8,8))
     for i in range(n):
@@ -31,6 +32,7 @@ def standard_plot(ensemble):
     plt.axis((-xlim, xlim, -xlim, xlim))
     plt.legend()
     plt.show()
+    return None
 
 
 def mkfile(data, name):
@@ -73,11 +75,9 @@ def simple_anim(everything):
     numstps = everything['time steps']
     
     datalines = [data[i] for i in range(int(numobjs))]
-    print(datalines[0])
+    print(np.shape(datalines))
     
     
-    # Creating fifty line objects.
-    # NOTE: Can't pass empty arrays into 3d version of plot()
     
     lim = np.max(data)
     # Setting the axes properties
@@ -93,9 +93,9 @@ def simple_anim(everything):
     ax.set_title('3D Test')
     
     # Creating the Animation object
-    line_ani = anim.FuncAnimation(fig, update_points, np.arange(1,numstps), \
+    line_ani = anim.FuncAnimation(fig, update_points, np.arange(0,2), #np.arange(1,numstps), \
                                        fargs=(datalines, ax), \
                                        interval=25, blit=False)
     
-    plt.show()
+    
     return line_ani
