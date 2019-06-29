@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 from matplotlib import animation as anim
 
     
-def no_plot(ensemble):
+def no_plot(everything):
     return None
 
 
