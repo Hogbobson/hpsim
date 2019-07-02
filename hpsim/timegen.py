@@ -6,7 +6,7 @@ Created on Tue May 28 13:32:53 2019
 @author: hogbobson
 """
 import numpy as np
-from datetime.datetime import utcnow
+from datetime import datetime
     
 def time_seconds(seconds):
     return seconds
@@ -33,7 +33,7 @@ def time_Myr(mega_years):
     return time_years(1e6*mega_years)
 
 def current_time():
-    t = utcnow()
+    t = datetime.utcnow()
     hour_decimal = t.hour + t.minute/60 + t.second/3600 + \
                     (t.microsecond/1e6)/3600
     time_dict = {'year': t.year     ,

@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 import mpl_toolkits.mplot3d.axes3d as p3
 from matplotlib import pyplot as plt
-from matplotlib import animation as anim
+from matplotlib import animation
 
     
 def no_plot(everything):
@@ -28,7 +28,7 @@ def standard_plot(everything):
     plt.xlabel('x')
     plt.ylabel('y')
     xlim = np.max(ensemble['r data'])*1.1
-    xlim = 5*1e11
+    #xlim = 5*1e11
     plt.axis((-xlim, xlim, -xlim, xlim))
     plt.legend()
     plt.show()
@@ -40,9 +40,53 @@ def mkfile(data, name):
     f = h5py.File(fname, 'w')
     f.create_dataset(name, data = data)
     f.close()
-
     
-def simple_anim(everything):
+
+def simple_2d_anim(everything):
+    data = everything['ensemble']['r data']
+    nobjs = everything['ensemble']['number of objects']
+    nsteps = everything['time steps']
+    labels = everything['ensemble']['label']
+    
+    fig, ax = plt.subplots(figsize = (8,8))
+    lim = np.max(data)*1.2
+    if lim > 1e13:
+        lim = 5e11
+    
+    x = data[:,0,:]
+    y = data[:,1,:]
+    
+    x_start = data[:,0,0]
+    y_start = data[:,1,0]
+    
+    lines = [ax.plot(x_start[j], y_start[j], 'o', label = labels[j])[0] \
+             for j in range(int(nobjs))]
+    
+    ax.set_xlim([-lim, lim])
+    ax.set_xlabel('x [m]')
+    ax.set_ylim([-lim, lim])
+    ax.set_ylabel('y [m]')
+    ax.legend()
+    
+    
+    def animate(i, x, y, lines):
+        for line, p in zip(lines, range(int(nobjs))):
+            line.set_xdata(x[p,i])
+            line.set_ydata(y[p,i])
+        return lines
+    
+    
+    
+    ani = animation.FuncAnimation(fig, animate, np.arange(0,nsteps-1), \
+                                  fargs = (x, y, lines), \
+                                  interval = 10)
+    
+    plt.draw()
+    
+    #ani.save('yolo.MPEG', writer = 'ffmpeg')
+    return ani
+    
+def simple_3d_anim(everything):
     def update_points(num, dataLines, ax):
         ax.clear()
         ax.scatter(
@@ -93,9 +137,11 @@ def simple_anim(everything):
     ax.set_title('3D Test')
     
     # Creating the Animation object
-    line_ani = anim.FuncAnimation(fig, update_points, np.arange(0,2), #np.arange(1,numstps), \
+    line_ani = animation.FuncAnimation(fig, update_points, numstps, \
                                        fargs=(datalines, ax), \
                                        interval=25, blit=False)
+    plt.draw()
+    
     
     
     return line_ani

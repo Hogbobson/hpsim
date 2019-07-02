@@ -18,11 +18,12 @@ from . import visual
 from . import energy
 
 
-def main(          ensemble_generator = ensgen.random_solar_system  ,
+
+def main(          ensemble_generator = ensgen.solar_system  ,
                    integration_func = ntgrtr.n_squared              , 
                    solver_func = solver.sym2                        , 
                    wanted_forces = [force.gravity]                  , 
-                   plot_func = visual.simple_anim                   ,
+                   plot_func = visual.simple_2d_anim                   ,
                    plot_save = False                                ,
                    energy_func = energy.no_energy                   ,   
                    time_start = 0                                   , 
