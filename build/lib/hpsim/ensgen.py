@@ -1,243 +1,290 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue May 28 11:34:21 2019
+Created on Sat Jun 29 17:04:09 2019
 
 @author: hogbobson
 """
+
 import numpy as np
 from numpy import random as rng, linalg as LA
 from astropy import constants as astcnst
-from scipy import constants as phycnst
 from math import radians as rad
+from hpsim import energy
 from hpsim.miscfuncs import distances
-    
+from hpsim.timegen import current_time
+
 class StarSystemGenerator:
     def __init__(self):
-        self.sma      = []
-        self.r        = np.empty((0,3), float)
-        self.rm       = []
-        self.r_legacy = np.empty((0,3,0), float)
-        self.v        = []
-        self.vm       = []
-        self.d        = []
-        self.e        = []
-        self.i        = []
-        self.m        = []
-        self.n        = 0
-        self.ref      = np.empty(0,int)
-        self.label    = []
+        self.r      = np.empty((0,3), float)    # Position r
+        self.v      = np.empty((0,3), float)    # Velocity v
+        self.m      = []                        # Mass m
+        self.n      = 0                         # Number of objects
+        self.label  = []                        # Label, for ???
+        self.set_time()#td = {'year': 1990, 'month': 4, 'day': 19, 'hour': 0})
+        #self.central_star()
         
     
-    def get_ensemble(self):
-        others   = {'semi major axis': self.sma,
-                    'eccentricity': self.e,
-                    'inclination': self.i,
-                    'reference body': self.ref
-                }
+    def _rotation_x(self, phi):
+        R = np.zeros((3,3))
+        R[0,0] = 1
+        R[1,1] = np.cos(phi)
+        R[1,2] = -np.sin(phi)
+        R[2,1] = np.sin(phi)
+        R[2,2] = np.cos(phi)
+        return R
+    
+    
+    def _rotation_z(self, phi):
+        R = np.zeros((3,3))
+        R[0,0] = np.cos(phi)
+        R[1,1] = np.cos(phi)
+        R[0,1] = -np.sin(phi)
+        R[1,0] = np.sin(phi)
+        R[2,2] = 1
+        return R
         
-        ensemble = {'r': self.r,
-                    'r magnitude': self.rm,
-                    'r data': self.r_legacy,
-                    'distance': self.d,
-                    'velocity': self.v,
-                    'velocity magnitude': self.vm,
-                    'mass': self.m,
-                    'number of objects': self.n,
-                    'label': self.label,
-                    'rem': others
+    
+    def _ecc_anomaly(self, E0, e, M):
+        E1 = E0 - (E0 - e*np.sin(E0) - M)/(1 - e*np.cos(E0))
+        if E1 - E0 > 1e-5:# and E1 < E0:
+            return self._ecc_anomaly(E1, e, M)
+        elif E1 - E0 < 1e5:# and E1 < E0:
+            return E1
+        #elif E1 > E0:
+        #    raise Exception('orbit is not elliptical')
+        
+        
+    def _orbit_to_cart(self, Omega, i, omega, a, e, M):
+        # Get shorter constants        
+        G = astcnst.G.value
+        M_sun = self.m[0]
+        eps = rad(23.43928)
+        
+        # Calculations
+        E       = self._ecc_anomaly(M, e, M)
+        nu      = 2*np.arctan2(np.sqrt(1+e)*np.sin(E/2), \
+                               np.sqrt(1-e)*np.cos(E/2))
+        rm      = a * (1 - e*np.cos(E))
+        o       = rm * np.array([np.cos(nu), np.sin(nu), 0])
+        odot    = np.sqrt(G * M_sun * a) / rm * \
+                       np.array([-np.sin(E), np.sqrt(1 - e*e)*np.cos(E), 0])
+                       
+        # Rotation matrices
+        R_z_O   = self._rotation_z(-Omega)
+        R_x_i   = self._rotation_x(-i)
+        R_z_o   = self._rotation_z(-omega)
+        
+        # Outputs
+        r       = np.dot(R_z_O, np.dot(R_x_i, np.dot(R_z_o, o)))
+        v       = np.dot(R_z_O, np.dot(R_x_i, np.dot(R_z_o, odot)))
+        #r = o
+        #v = odot
+        
+        # MAYBE MOVE THIS PART OUT EVENTUALLY
+        #r[1]    = np.cos(eps)*r[1] - np.sin(eps)*r[2]
+        #r[2]    = np.sin(eps)*r[1] + np.cos(eps)*r[2]
+        #v[1]    = np.cos(eps)*v[1] - np.sin(eps)*v[2]
+        #v[2]    = np.sin(eps)*v[1] + np.cos(eps)*v[2]
+        
+        # Appending
+        self.r = np.append(self.r, np.array([r]), axis = 0)
+        self.v = np.append(self.v, np.array([v]), axis = 0)
+        self.n += 1        
+    
+    
+    
+    def get_ensemble(self):
+        ensemble = {'r'             : self.r                                ,
+                    'r magnitude'   : LA.norm(self.r, axis = 1)             ,
+                    'r data'        : np.reshape(self.r, (self.n, 3, 1))    ,
+                    'distance'     : distances(self.r)                     ,
+                    'velocity'      : self.v                                ,
+                    'velocity magnitude': LA.norm(self.v, axis = 1)         ,
+                    'mass'          : self.m                                ,
+                    'energy'        : None                                  ,
+                    'energy data'   : None                                  ,
+                    'number of objects': self.n                             ,
+                    'label'         : self.label                            ,
+                    'remaining'     : None
                 }
         return ensemble
     
+    def set_ensemble(self):
+        pass
     
-    def set_ensemble(self, ensemble):
-        self.sma      = ensemble['rem']['semi major axis']
-        self.r        = ensemble['r']
-        self.rm       = ensemble['r magnitude']
-        self.r_legacy = ensemble['r data']
-        self.v        = ensemble['velocity']
-        self.vm       = ensemble['velocity magnitude']
-        self.d        = ensemble['distance']
-        self.e        = ensemble['rem']['eccentricity']    
-        self.i        = ensemble['rem']['inclination']
-        self.m        = ensemble['mass']
-        self.n        = ensemble['number of objects']
-        self.ref      = ensemble['rem']['reference body']
-        self.label    = ensemble['label']
+    def set_time(self, td = current_time()):
+        """ Function setting the day-number as per section 3 at
+            https://stjarnhimlen.se/comp/ppcomp.html """
+        y = td['year']
+        m = td['month']
+        D = td['day']
+        UT = td['hour']
+        self.day_number = 367*y - 7 * ( y + (m+9)//12 ) // 4 - \
+                        3 * ( ( y + (m-9)//7 ) // 100 + 1 ) // 4 + \
+                        275*m//9 + D - 730515 + UT/24.0
+    
+    
+    
+    def rev(self, angle):
+        while angle > np.pi:
+            angle -= 2*np.pi
+        while angle < -np.pi:
+            angle += 2*np.pi
+        return angle
+    
+    
+    def mean_anomaly(self, semi_major_axis, M_central = astcnst.M_sun.value):
+        pass
         
-        
-        
+    
     def central_star(self, mass = astcnst.M_sun.value):
-        self.r          = np.append(self.r, \
-                                [[0., 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, mass)
+        self.r = np.append(self.r, [[0., 0., 0.,]], axis = 0)
+        self.v = np.append(self.v, [[0., 0., 0.,]], axis = 0)
+        self.m = np.append(self.m, mass)
         self.label.append('Sun')
-        self.sma = np.append(self.sma, 0)
-        self.e   = np.append(self.e, 0)
-        self.i   = np.append(self.i, 0)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        self.n += 1
+        
     
-    ##### KNOWN PLANETS #####
+    
+    # Omega     = Longitude of the Ascending Node (LAN) [rad]
+    # i         = Inclination [rad]
+    # omega     = Argument of Periapsis [rad]
+    # a         = Semi-major-axis [m]
+    # e         = Eccentricity [1]
+    # M         = Mean anomaly [rad]
+    # Thank you to https://stjarnhimlen.se/comp/ppcomp.html
+    
     def mercury(self):
-        semi_major_axis = 57.91e9
-        aphelion        = 69.82e9
-        eccentricity    = 0.2056
-        inclination     = rad(7.0)
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value*0.0553)
+        # Get shorter constants
+        d = self.day_number
+        
+        # Inputs
+        Omega   = self.rev(rad(48.3313 + 3.24587E-5 * d))
+        i       = self.rev(rad(7.0047 + 5.00E-8 * d))
+        omega   = self.rev(rad(29.1241 + 1.01444E-5 * d))
+        a       = 0.387098*astcnst.au.value
+        e       = 0.205635 + 5.59E-10 * d
+        M       = self.rev(rad(168.6562 + 4.0923344368 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
         self.label.append('Mercury')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        self.m  = np.append(self.m, astcnst.M_earth.value*0.0553)
     
     def venus(self):
-        semi_major_axis = 108.21e9   # Venus Semi-major axis, [m].
-        aphelion        = 108.94e9   # Venus _aphelion, [m].
-        eccentricity    = 0.0067     # Venus _eccentricity
-        inclination     = rad(3.39)  # Venus _inclination
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                            astcnst.M_earth.value*0.815)
-        self.label.append('Venus')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        # Get shorter constants
+        d = self.day_number
         
-
+        # Inputs
+        Omega   = self.rev(rad(76.6799 + 2.46590E-5 * d))
+        i       = self.rev(rad(3.3946 + 2.75E-8 * d))
+        omega   = self.rev(rad(54.8910 + 1.38374E-5 * d))
+        a       = 0.723330*astcnst.au.value
+        e       = 0.006773 - 1.302E-9 * d
+        M       = self.rev(rad(48.0052 + 1.6021302244 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
+        self.label.append('Venus')
+        self.m  = np.append(self.m, astcnst.M_earth.value*0.815)
+    
     def earth(self):
-        semi_major_axis = 149.60e9    # Earth Semi-major axis, [m].
-        aphelion        = 152.1e9     # Earth _aphelion, [m].
-        eccentricity    = 0.0167      # Earth _eccentricity.
-        inclination     = rad(0.00005)# Earth _inclination.
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value)
+        # Get shorter constants
+        d = self.day_number
+        
+        # Inputs
+        Omega   = 0.
+        i       = 0.
+        omega   = self.rev(rad(282.9404 + 4.70935e-5 * d))
+        a       = astcnst.au.value
+        e       = 0.016709 - 1.151E-9 * d
+        M       = self.rev(rad(356.0470 + 0.9856002585 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
         self.label.append('Earth')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        self.m  = np.append(self.m, astcnst.M_earth.value)
         
     
     def mars(self):
-        semi_major_axis = 227.92e9    # Mars Semi-major axis, [m].
-        aphelion        = 249.23e9     # Mars _aphelion, [m].
-        eccentricity    = 0.0935      # Mars _eccentricity.
-        inclination     = rad(1.85)# Mars _inclination.
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value * 0.107)
-        self.label.append('Mars')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        # Get shorter constants
+        d = self.day_number
         
+        # Inputs
+        Omega   = self.rev(rad(49.5574 + 2.11081E-5 * d))
+        i       = self.rev(rad(1.8497 - 1.78E-8 * d))
+        omega   = self.rev(rad(286.5016 + 2.92961E-5 * d))
+        a       = 1.523688*astcnst.au.value
+        e       = 0.093405 + 2.516E-9 * d
+        M       = self.rev(rad(18.6021 + 0.5240207766 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
+        self.label.append('Mars')
+        self.m  = np.append(self.m, astcnst.M_earth.value*0.107)
     
     def jupiter(self):
-        semi_major_axis = 778.57e9
-        aphelion      = 816.62e9
-        eccentricity  = 0.0489
-        inclination   = rad(1.304)
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_jup.value)
+        # Get shorter constants
+        d = self.day_number
+        
+        # Inputs
+        Omega   = self.rev(rad(100.4542 + 2.76854e-5 * d))
+        i       = self.rev(rad(1.3030 - 1.557e-7 * d))
+        omega   = self.rev(rad(273.8777 + 1.64505E-5 * d))
+        a       = 5.20256*astcnst.au.value
+        e       = 0.048498 + 4.469E-9 * d
+        M       = self.rev(rad(19.8950 + 0.0830853001 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
         self.label.append('Jupiter')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        self.m  = np.append(self.m, astcnst.M_jup.value)
         
-    
+        
     def saturn(self):
-        semi_major_axis = 1433.53e9
-        aphelion        = 1514.50e9
-        eccentricity    = 0.0565
-        inclination     = rad(2.485)
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value * 95.16)
-        self.label.append('Saturn')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        # Get shorter constants
+        d = self.day_number
         
+        # Inputs
+        Omega   = self.rev(rad(113.6634 + 2.38980E-5 * d))
+        i       = self.rev(rad(2.4886 - 1.081E-7 * d))
+        omega   = self.rev(rad(339.3939 + 2.97661E-5 * d))
+        a       = 9.55475*astcnst.au.value
+        e       = 0.055546 - 9.499E-9 * d
+        M       = self.rev(rad(316.9670 + 0.0334442282 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
+        self.label.append('Saturn')
+        self.m  = np.append(self.m, astcnst.M_earth.value * 95.16)
     
     def uranus(self):
-        semi_major_axis = 2872.46e9
-        aphelion        = 3003.62e9
-        eccentricity    = 0.0457
-        inclination     = rad(0.772)
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value * 14.54)
-        self.label.append('Uranus')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
+        # Get shorter constants
+        d = self.day_number
         
+        # Inputs
+        Omega   = self.rev(rad(74.0005 + 1.3978E-5 * d))
+        i       = self.rev(rad(0.7733 + 1.9E-8 * d))
+        omega   = self.rev(rad(96.6612 + 3.0565E-5 * d))
+        a       = 19.18171 - 1.55E-8 * d * astcnst.au.value
+        e       = 0.047318 + 7.45E-9 * d
+        M       = self.rev(rad(142.5905 + 0.011725806 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
+        self.label.append('Uranus')
+        self.m  = np.append(self.m, astcnst.M_earth.value * 14.54)
     
     def neptune(self):
-        semi_major_axis = 4495.06e9
-        aphelion        = 4545.67e9
-        eccentricity    = 0.0113
-        inclination     = rad(1.769)
-        self.r          = np.append(self.r, \
-                            [[aphelion, 0., 0.]], axis = 0)
-        self.m       = np.append(self.m, \
-                                astcnst.M_earth.value * 17.15)
+        # Get shorter constants
+        d = self.day_number
+        
+        # Inputs
+        Omega   = self.rev(rad(131.7806 + 3.0173E-5 * d))
+        i       = self.rev(rad(1.7700 - 2.55E-7 * d))
+        omega   = self.rev(rad(272.8461 - 6.027E-6 * d))
+        a       = 30.05826 + 3.313E-8 * d * astcnst.au.value
+        e       = 0.008606 + 2.15E-9 * d
+        M       = self.rev(rad(260.2471 + 0.005995147 * d))
+        
+        self._orbit_to_cart(Omega, i, omega, a, e, M)
         self.label.append('Neptune')
-        self.sma = np.append(self.sma, \
-                                semi_major_axis)
-        self.e   = np.append(self.e, \
-                                eccentricity)
-        self.i   = np.append(self.i, \
-                                inclination)
-        self.ref = np.append(self.ref, 0)
-        self.n  += 1
-    ##### END KNOWN PLANETS #####
-    
+        self.m  = np.append(self.m, astcnst.M_earth.value * 17.15)
+        
     def all_known_planets(self):
         self.mercury()
         self.venus()
@@ -245,79 +292,46 @@ class StarSystemGenerator:
         self.mars()
         self.jupiter()
         self.saturn()
-        self.uranus()
-        self.neptune()
-        
-    def random_planets(self, num_ran_planets):
-        def log_uniform(low = 1, high = 2, size = 1, base = 10):
+        #self.uranus()
+        #self.neptune()
+    
+    def random_planets(self, num = 5):
+        def log_uniform(low, high, size = 1, base = 10):
             return np.power(base, rng.uniform(low, high, size))
         
-        for i in range(num_ran_planets):
-            x = log_uniform(9, 11)
-            y = log_uniform(9, 11)
-            z = log_uniform(0, 7)
-            r = np.reshape(np.array([x, y, z]), (1,3))
-            m = np.maximum(rng.randn()+3, 1e-5)*astcnst.M_earth.value*1e-3
-            rmax = LA.norm(np.array([x, y, z]), axis = 0)
-            e = np.minimum(np.abs(rng.randn()*0.1), 0.95)
-            sma = rmax / (1 + e)
-            i = np.arccos(z/rmax)
-            self.r = np.append(self.r, r, axis = 0)
-            self.m = np.append(self.m, m)
-            self.label.append('random planet #' + str(i))
-            self.sma = np.append(self.sma, sma)
-            self.e = np.append(self.e, e)
-            self.i = np.append(self.i, i)
-            self.ref = np.append(self.ref, 0)
-            self.n += 1
-                    
+        for i in range(num):
+            Omega = 360*rng.random() - 180
+            i     = np.pi/6*rng.randn()
+            omega = 360*rng.random() - 180
+            a     = log_uniform(-2, 1) * astcnst.au.value
+            e     = np.minimum(np.abs(rng.randn()*0.1), 0.95)
+            M     = 360*rng.random() - 180
+            
+            self._orbit_to_cart(Omega, i, omega, a, e, M)
+            self.label.append(['planet #', i])
+            self.m = np.append(self.m, np.maximum(rng.randn()+3, 1e-5) \
+                               * astcnst.M_earth.value*1e-3)
     
-    def velocities_with_central_star(self):
-        """ Makes the rm vector and sets the velocities, 
-        as per parametres. """
-        n = self.n
-        self.d  = distances(self.r)
-        #dm             = LA.norm(self.d, axis = 2)
-        self.rm = LA.norm(self.r, axis = 1)
-        theta_v = np.zeros(n)
-        theta_v[1:n] = np.pi/2 - \
-                np.arctan(np.abs(self.r[1:n, 1]/self.r[1:n, 0]))
-        self.vm = np.zeros_like(self.m)
-        self.vm[1:n] = np.sqrt(astcnst.G.value * \
-                        self.m[0] * (2/self.rm[1:n] - \
-                        1/self.sma[1:n]))
-        alpha = np.reshape(np.sqrt(1. - self.e**2), (n, 1))
-        self.v  = np.zeros_like(self.r)
-        self.v[:n,0] = -1 * np.sign(self.r[:n,1]) * \
-                        np.cos(theta_v[:n]) * self.vm[:n]
-        self.v[:n,1] = np.sign(self.r[:n,0]) * \
-                        np.cos(theta_v[:n]) * self.vm[:n]
-        self.v[:n,:] = self.v[:n,:] * alpha[:n]
-        self.v[:n,2] = self.vm - LA.norm(self.v[:n,:], axis = 1)
-        self.vm = LA.norm(self.v, axis = 1)
-        self.r_legacy = np.reshape(self.r, (n, 3, 1))
-    
-    
-    
-    #for ith_dict in generator_list:
-    #    ensemble = ith_dict['function name(ensemble, ith_dict['arg)
-        
-    #return ensemble
-
 def solar_system():
     SSG = StarSystemGenerator()
     SSG.central_star()
     SSG.all_known_planets()
-    SSG.velocities_with_central_star()
     
     ensemble = SSG.get_ensemble()
+    #ensemble = energy.brute_kinetic_energy(ensemble)
     return ensemble
     
 def random_solar_system():
     SSG = StarSystemGenerator()
     SSG.central_star()
-    SSG.random_planets(10)
-    SSG.velocities_with_central_star()
+    SSG.random_planets(5)
+    #SSG.velocities_with_central_star()
     
     ensemble = SSG.get_ensemble()
+    #ensemble = energy.brute_kinetic_energy(ensemble)
     return ensemble
+    pass    
+        
+        
+        
+        

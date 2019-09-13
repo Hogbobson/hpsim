@@ -24,4 +24,4 @@ def four(ensemble, dt, forces):
     ensemble['r'] += 5*4e9
     return ensemble
 
-e = main.main(solver_func = euler_integration)
+e = main.main(solver_func = four)
