@@ -12,6 +12,7 @@ from astropy import constants as astcnst
 from math import radians as rad
 from hpsim import energy
 from hpsim.miscfuncs import distances
+from hpsim.miscfuncs import legit_body_parametres as lbp
 from hpsim.timegen import current_time
 
 class StarSystemGenerator:
@@ -98,7 +99,7 @@ class StarSystemGenerator:
         ensemble = {'r'             : self.r                                ,
                     'r magnitude'   : LA.norm(self.r, axis = 1)             ,
                     'r data'        : np.reshape(self.r, (self.n, 3, 1))    ,
-                    'distance'     : distances(self.r)                     ,
+                    'distance'      : distances(self.r)                     ,
                     'velocity'      : self.v                                ,
                     'velocity magnitude': LA.norm(self.v, axis = 1)         ,
                     'mass'          : self.m                                ,
@@ -312,6 +313,106 @@ class StarSystemGenerator:
             self.m = np.append(self.m, np.maximum(rng.randn()+3, 1e-5) \
                                * astcnst.M_earth.value*1e-3)
     
+
+class many_bodies_generator:
+    def __init__(self, scale = 'molecular', 
+                 charge_init_and_spread = [None, None],):
+        
+        self.r      = np.empty((0,3), float)    # Position r
+        self.v      = np.empty((0,3), float)    # Velocity v
+        self.m      = []                        # Mass m
+        self.n      = 0                         # Number of objects
+        self.label  = []                        # Label, for ???
+        self.parameter_dict = {}
+        # TODO: MAKE IT AN OPTION TO MAKE YOUR OWN PHYSICAL PARAMETRES,
+        # INSTEAD OF JUST CHANING THE VALUES OF THE PARAMETRES I HAVE DEFINED.
+        if None not in charge_init_and_spread:
+            self.q  = []
+            self.parameter_dict['var charge'] = self.q
+            self.parameter_dict['init charge'] = charge_init_and_spread[0]
+            self.parameter_dict['spread charge'] = charge_init_and_spread[1]
+        else:
+            self.q  = None
+        
+    
+    def make_body(self, offset = np.zeros((1,3)), 
+                  initial_velocity = np.zeros((1,3)),
+                  initial_mass = 1,
+                  spread_pos = 10,
+                  spread_vel = 0,
+                  spread_mass = 0):
+        """ Makes a body based on input parametres and the parametres
+        initialised in the instance of many_bodies_generator. """
+        def log_uniform(low, high, size = 1, base = 10):
+            return np.power(base, rng.uniform(low, high, size))
+        
+        pos = spread_pos * rng.randn(3) + offset
+        vel = spread_vel * rng.randn(3) + initial_velocity
+        mass = np.abs(spread_mass * rng.randn(1)) + initial_mass
+        
+        # Setting up setting up the secial parametres
+        par_keys = list(self.parameter_dict.keys())
+        for i in np.arange(0, len(par_keys), 3):
+            self.parameter_dict[par_keys[i]][:] = \
+                np.append(self.parameter_dict[par_keys[i]][:],
+                          self.parameter_dict[par_keys[i+2]] * rng.randn(1) +
+                          self.parameter_dict[par_keys[i+1]])
+        self.r = np.append(self.r, pos, axis = 0)
+        self.v = np.append(self.v, vel, axis = 0)
+        self.m = np.append(self.m, mass)
+        self.n += 1
+        
+    
+    def make_many_bodies(self, num_bods, offset = 0, 
+                  initial_velocity = 0,
+                  initial_mass = 1,
+                  spread_pos = 10,
+                  spread_vel = 0,
+                  spread_mass = 0):
+        """ Makes a body based on input parametres and the parametres
+        initialised in the instance of many_bodies_generator. """
+        def log_uniform(low, high, size = 1, base = 10):
+            return np.power(base, rng.uniform(low, high, size))
+        
+        pos = spread_pos * rng.randn((num_bods, 3)) + offset
+        vel = spread_vel * rng.randn((num_bods, 3)) + initial_velocity
+        mass = np.abs(spread_mass * rng.randn(num_bods)) + initial_mass
+        
+        # Setting up setting up the secial parametres
+        par_keys = list(self.parameter_dict.keys())
+        for i in np.arange(0, len(par_keys), 3):
+            self.parameter_dict[par_keys[i]][:] = \
+                np.append(self.parameter_dict[par_keys[i]][:],
+                          self.parameter_dict[par_keys[i+2]] * \
+                          rng.randn(num_bods) +
+                          self.parameter_dict[par_keys[i+1]])
+        self.r = np.append(self.r, pos, axis = 0)
+        self.v = np.append(self.v, vel, axis = 0)
+        self.m = np.append(self.m, mass)
+        self.n += num_bods
+        
+    
+    
+    def get_ensemble(self):
+        ensemble = {'position'      : self.r,
+                    'position magnitude': LA.norm(self.r, axis = 1),
+                    'position data' : np.reshape(self.r, (self.n, 3, 1)),
+                    'distance'      : distances(self.r),
+                    'velocity'      : self.v,
+                    'velocity magnitude': LA.norm(self.v, axis = 1),
+                    'mass'          : self.m,
+                    'energy'        : None,
+                    'energy data'   : None,
+                    'number of objects': self.n,
+                    'label'         : self.label,
+                    'remaining'     : None,
+                    'charge'        : self.q
+                }
+        return ensemble
+        
+        
+    
+    
 def solar_system():
     SSG = StarSystemGenerator()
     SSG.central_star()
@@ -330,8 +431,10 @@ def random_solar_system():
     ensemble = SSG.get_ensemble()
     #ensemble = energy.brute_kinetic_energy(ensemble)
     return ensemble
-    pass    
         
-        
-        
+def no_central_object(num_bodies = 10):
+    MBG = many_bodies_generator(charge_init_and_spread = [1, 0])
+    for i in range(num_bodies):
+        MBG.make_body()
+    return MBG.get_ensemble()
         

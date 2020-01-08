@@ -7,13 +7,29 @@ can be plugged in and out.
 """
 
 import numpy as np
+from numpy import linalg as LA
 
 
-def classic_acceleration(mass, *args):
+def single_force_acceleration(ensemble, force):
     """ classic_acceleration really does just add all the forces together. 
     Inputs should be force matrices of equal sizes."""
-    total_F = np.zeros_like(args[0])
-    for F in args:
-        total_F += F
-    acc = total_F / np.reshape(mass, np.append(len(mass), 1))
-    return acc
+    mass  = ensemble['affectee mass'].flatten()
+    force = force.flatten()
+    acceleration = np.empty_like(mass)
+    
+    for i in range(mass.size):
+        m_temp = mass[i].reshape(np.append(mass[i].shape, 1))
+        acceleration[i] = force[i]/m_temp
+    #if LA.norm(acceleration[0]) < 1.004:
+    #    print(acceleration[0])
+    #print("acc " + str(LA.norm(acceleration[0])))
+    
+    return acceleration
+    
+# =============================================================================
+#     total_F = np.zeros_like(args[0])
+#     for F in args:
+#         total_F += F
+#     acc = total_F / np.reshape(mass, np.append(len(mass), 1))
+#     return acc
+# =============================================================================

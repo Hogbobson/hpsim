@@ -10,13 +10,16 @@ import numpy as np
 from . import force
 
 
-def distances(vec): # There must be an easier way.
+def distances(vec1, vec2): # There must be an easier way.
     """ Converts matrix elements from origin -> object to object -> object. \
     Naturally, the dimensions in the matrix increase because of that. """
-    newr = np.zeros((np.shape(vec)[0],np.shape(vec)[0],3))
+    newr = np.zeros((np.shape(vec1)[0],np.shape(vec2)[0],3))
     for i in range(3):  #For future: get rid of loop, if possible.
-        newr[:,:,i] = vec[:,i].reshape(1,np.size(vec[:,i])) - \
-        vec[:,i].reshape(np.size(vec[:,i]),1)
+        v1 = vec1[:,i].reshape(np.size(vec1[:,i]),1)
+        v2 = vec2[:,i].reshape(1,np.size(vec2[:,i]))
+        newr[:,:,i] = v1 - v2
+        #newr[:,:,i] = vec1[:,i].reshape(1,np.size(vec1[:,i])) - \
+        #vec2[:,i].reshape(np.size(vec2[:,i]),1)
     return newr 
 
 def get_force_variables(forces):
@@ -37,29 +40,31 @@ def legit_body_parametres(input_key):
     
 
 def ensemble_checker(ensemble, force_vars):
-    proto_ensemble = {'position'        : [type(np.empty(0))],
-                      'position magnitude' : [type(np.empty(0))],
-                      'position data'   : [type(np.empty(0))],
-                      'distance'        : [type(np.empty(0))],
+    proto_ensemble = {#'position'        : [type(np.empty(0))],
+                      #'position magnitude' : [type(np.empty(0))],
+                      #'position data'   : [type(np.empty(0))],
+                      #'distance'        : [type(np.empty(0))],
                       'velocity'        : [type(np.empty(0))],
-                      'velocity magnitude': [type(np.empty(0))],
-                      'mass'            : [type(np.empty(0))],
+                      #'velocity magnitude': [type(np.empty(0))],
+                      #'mass'            : [type(np.empty(0))],
                       'energy'          : [type(None)],
                       'energy data'     : [type(None)],
                       'number of objects': [type(1), type(1.)],
                       'label'           : [type([])],
             }
-    
-    for key, type_at_key in proto_ensemble.items():
-        try:
-            if type(ensemble[key]) in type_at_key:
-                print('key: ' + key + ' has a correct type')
-            else:
-                raise SystemExit('The ensemble at key: ' + key + ' has type' + \
-                       str(type(ensemble[key])) + ', expected type ' + \
-                       type_at_key)
-        except KeyError:
-            raise('Ensemble has no key' + key)
+    pass
+# =============================================================================
+#     for key, type_at_key in proto_ensemble.items():
+#         try:
+#             if type(ensemble[key]) in type_at_key:
+#                 print('key: ' + key + ' has a correct type')
+#             else:
+#                 raise SystemExit('The ensemble at key: ' + key + ' has type' + \
+#                        str(type(ensemble[key])) + ', expected type ' + \
+#                        type_at_key)
+#         except KeyError:
+#             raise('Ensemble has no key' + key)
+# =============================================================================
     
     # TODO: MAKE BELOW WORK
 # =============================================================================

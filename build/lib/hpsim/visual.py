@@ -22,12 +22,13 @@ def standard_plot(everything):
     n = ensemble['number of objects']
     plt.figure(num = 0, figsize = (8,8))
     for i in range(n):
-        plt.plot(ensemble['r data'][i,0,:], ensemble['r data'][i,1,:], '-', \
-                 label = ensemble['label'][i], \
+        plt.plot(ensemble['position data'][i,0,:], 
+                 ensemble['position data'][i,1,:], '-',
+                 label = ensemble['label'][i],
                  color = (abs(np.sin(i)), 0 + i/n, 1-i/n))
     plt.xlabel('x')
     plt.ylabel('y')
-    xlim = np.max(ensemble['r data'])*1.1
+    xlim = np.max(ensemble['position data'])*1.1
     #xlim = 5*1e11
     plt.axis((-xlim, xlim, -xlim, xlim))
     plt.legend()
@@ -42,11 +43,11 @@ def mkfile(data, name):
     f.close()
     
 
-def simple_2d_anim(everything):
-    data = everything['ensemble']['r data']
-    nobjs = everything['ensemble']['number of objects']
-    nsteps = everything['time steps']
-    labels = everything['ensemble']['label']
+def simple_2d_anim(ensemble, stps):
+    data = ensemble['position data']
+    nobjs = ensemble['number of objects']
+    nsteps = stps
+    labels = ensemble['label']
     
     fig, ax = plt.subplots(figsize = (8,8))
     lim = np.max(data)*1.2
@@ -59,7 +60,11 @@ def simple_2d_anim(everything):
     x_start = data[:,0,0]
     y_start = data[:,1,0]
     
-    lines = [ax.plot(x_start[j], y_start[j], 'o', label = labels[j])[0] \
+    if labels:
+        lines = [ax.plot(x_start[j], y_start[j], 'o', label = labels[j])[0] \
+             for j in range(int(nobjs))]
+    else:
+        lines = [ax.plot(x_start[j], y_start[j], 'o')[0] \
              for j in range(int(nobjs))]
     
     ax.set_xlim([-lim, lim])

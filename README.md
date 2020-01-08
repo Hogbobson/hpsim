@@ -27,3 +27,9 @@ TODO: make 'certain variables' customizable, so the user can input his/her own.
 
 v0.5.2
 Dissatisfied with the deep-nested callings of functions throughout the programme, I changed it so it's now a more flat structure. Should make it easier to customize.
+
+
+v0.8.0
+Definitely skipped a few version numbers. Last time I uploaded there was still a set structure. Hpsim now allows for any function, with any input, and any output. More description to come. TODO: Better visualization.
+
+

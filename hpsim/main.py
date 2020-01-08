@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun Jul 14 18:51:19 2019
+Created on Wed Oct  9 11:50:32 2019
 
 @author: hogbobson
 """
-
 import numpy as np
+import fnmatch as fn
+import time
+
 from . import acceleration
 from . import force
 from . import miscfuncs
@@ -17,217 +19,509 @@ from . import timestep
 from . import timegen
 from . import visual
 from . import energy
+from . import arena
+from . import boundaries
 
 class hpsim:
-    def __init__(cls):
-        # The following N class variables are the main information
-        # needed to run the program.
+    def __init__(cls, preload = True):
+        # TODO: Documentation
+        cls.functions     = {}
+        cls.input_str     = ' input keys'
+        cls.ens_str       = ' ensemble keys'
+        cls.output_str    = ' output key'
+        cls.order_str     = ' order'
+        cls.loop_str      = ' loop status'
+        cls.prio_str      = ' priority'
         
-        cls._wanted_forces      = [force.gravity, force.electrostatics]
-        cls._force_dict         = {}
+        cls.definite_ensemble_keys = ['affectee position',
+                                      'affectee position data',
+                                      'affector position',
+                                      'affectee velocity',
+                                      'affectee mass',
+                                      'affector mass',
+                                      'velocity',
+                                      'energy',
+                                      'energy data',
+                                      'number of objects',
+                                      'label',
+                                      'affect status',
+                                      'remaining',
+                                      'charge',
+                                      'sigma',
+                                      'epsilon']
         
-        cls._plot_save          = False
-        cls._energy_func        = energy.no_energy
-        cls.time_start          = 0
-        cls.time_step           = timestep.constant_dt(1)
-        cls.time_end            = timegen.time_seconds(20)
-        cls._time_now            = cls.time_start
-        cls._iteration_steps     = 0
+        cls.data             = {}
+        cls.data['steps']    = 0
         
-        # The next variable is derived from cls._wanted_forces, used for
-        # ensemble generation.
-        cls._force_variables = miscfuncs.get_force_variables(
-                                            cls._wanted_forces)
+        cls.verbose = True
         
-        cls.ensemble = []
-        cls.set_acceleration_function(acceleration.classic_acceleration)
-        cls.set_wanted_forces(cls._wanted_forces)
-        cls.set_ensemble_generator(ensgen.no_central_object)
-        cls.set_integrator(integrator.n_squared)
-        cls.set_solver(solver.sym2, (cls.time_step,))
-        cls.set_ensemble()
+        if preload:
+            cls.preload_solar_system()
+        # TODO: Various toggles and shit
         
-        
-        # Nothing has been tested, and the class must know!
-        cls._ensemble_is_ok = False
-    
-    
-    def set_acceleration_function(cls, func, fargs = None):
-        # If no fargs are present, the input args should be empty.
-        if fargs:
-            cls._acceleration_args = fargs
-        else:
-            cls._acceleration_args = ()
-        cls._acceleration = func
-    
-    
-    # Ensemble methods follow
-    def set_ensemble_generator(cls, func, fargs = None, check_now = True):
-        """ This method sets the ensemble generator.
-        Inputs:
-        func:       
-            A required input function taking any number of arguments.
-            Should return the desired ensemble.
-        fargs = None:
-            A tuple containing all the arguments required by func.
-            Can be left blank in case func takes no arguments.
-        check_now = True:
-            A boolean to tell if the program should test the ensem-
-            ble generator now. Note that changing ensemble genera-
-            tor will make the ensemble flagged as unchecked."""
-        
-        # If no fargs are present, the input args should be empty.
-        if fargs:
-            cls._ensemble_generator_args = fargs
-        else:
-            cls._ensemble_generator_args = ()
-        cls._ensemble_generator = func
-        cls._ensemble_is_ok = False
-        if check_now:
-            cls._ensemble_is_ok = miscfuncs.ensemble_checker(
-                    cls._ensemble_generator(*cls._ensemble_generator_args),
-                    cls._force_variables)
-        #print(cls._ensemble_generator_args)
-        #print(type(cls._ensemble_generator_args))
-        #cls.ensemble = cls._ensemble_generator(*cls._ensemble_generator_args)
-            
-            
-    def set_ensemble(cls):
-        """ This method runs the ensemble generator and sets the
-        ensemble - and then checks it if it hasn't already been. """
-        
-        #print(cls._ensemble_generator_args)
-        #print(type(cls._ensemble_generator_args))
-        cls.ensemble = cls._ensemble_generator(*cls._ensemble_generator_args)
-        if not cls._ensemble_is_ok:
-            cls._ensemble_is_ok = miscfuncs.ensemble_checker(cls.ensemble,
-                                                        cls._force_variables)
-    
-    
-    def set_integrator(cls, func, fargs = None):
-        """ This method sets the integrator (name change pending).
-        Inputs:
-        func:
-            A required input function taking any number of arguments.
-            Should return the desired integration setup.
-        fargs = None:
-            A tuple containing all the arguments required by func.
-            Can be left blank in case func takes no arguments. """
-            
-        if fargs:
-            cls._integrator_args = fargs
-        else:
-            cls._integrator_args = ()
-        cls._integrator = func
-    
-    
-    def set_solver(cls, func, fargs = None):
-        """ This method sets the solver (iterator) function.
-        Inputs:
-        func:
-            A required input function taking any number of arguments.
-            Should return the ensemble iterated one time step forward.
-        fargs = None:
-            A tuple containing all the arguments required by func.
-            Can be left blank in case func takes no arguments. """
-        
-        if fargs:
-            cls._solver_args = fargs
-        else:
-            cls._ensemble_generator_args = ()
-        cls._solver = func
-    
-    
-    def set_wanted_forces(cls, funcs):
-        for f in funcs:
-            standard_force_params = force.check_force(f)
-            #check_force returns a dict if the force is standard, else False
-            if standard_force_params:
-                cls.set_force_dict(f, **standard_force_params)
-            else:
-                Warning('The force' + f + 'is not in the standard library. \
-                        you should call main.set_force_dict yourself.')
         
     
-    def set_force_dict(cls, func, keys, arg_keys):
-        """ Sets the force dict. First key should be named "force <name>", 
-        the second should be named "args <name>". It should throw an error,
-        if they don't. """
-        # TODO: MAKE FUNCTION THROW ERROR IF GIVEN KEYS DO NOT MATCH
-        cls._force_dict[keys[0]] = func
-        
-        if arg_keys:
-            cls._force_dict[keys[1]] = arg_keys
-        else:
-            cls._force_dict[keys[1]] = ()
-        
-        # A variable containing all keys in force_dict - for making use of it.
-        cls.force_dict_keys = list(cls._force_dict.keys())
-        
-        # cls.force_dict_keys is supposed to contain
-        # ['force force1', 'args force1'] etc
+    def _loop(cls):
+        st = time.time()
+        while cls._time_now < cls.time_end and cls.data['steps'] < cls.step_max:
+            cls._step()
+            cls._time_now += cls.time_step/cls.order
+            cls.data['steps'] += 1
+            print("FUCK YEAH!")
+            print(str(cls.data['steps']) + ' / ' + str(cls.step_max))
+        en = time.time()
+        cls.data['loop time'] = en - st
     
-    def set_plot_routine(cls, func, fargs = None):
-        if fargs:
-            cls._plot_args = fargs
-        else:
-            cls._plot_args = ()
-        cls._plot_func = func
-        
-    def record_data(cls, var_key, save_key):
-        cls.ensemble[save_key] = np.append(cls.ensemble[save_key],
-                                np.reshape(cls.ensemble[var_key],
-                                          (cls.ensemble['number of objects'],
-                                           3,1)), axis = 2)
+    def _loop_functions(cls, num_funcs, offset):
+        for i in range(num_funcs):
+            i += offset
+            if not cls.data['steps']%cls.priority[i]:
+                key_out = cls.output_keys[i]
+                dynamic_input = [cls.data[k] for k in cls.input_keys[i]]
+                for k in cls.ensemble_keys[i]:
+                    dynamic_input.append(cls.data['ensemble'][k])
+                cls.data[key_out] = cls.funcs[i](*dynamic_input)
+                cls.data['Previous Key'] = key_out
+    
+    def _step(cls):
+        cls._loop_functions(cls.funcs_in_loop, cls.funcs_b4_loop)
+    
+    def _preamble(cls):
+        cls._loop_functions(cls.funcs_b4_loop, 0)
+    
+    def _postprocessing(cls):
+        cls._loop_functions(cls.funcs_in_end, cls.funcs_b4_end)
     
     
-    def step(cls):
+    def _update(cls, func, params):
+        def do(*data):
+            return func(*data, *params)
+        if func:
+            return do
+        return
+    
+    def clear_func_dict(cls):
+        cls.functions = {}
+        cls.funcs = None
+        cls.output_keys = None
+        cls.input_keys = None
+        cls.ensemble_keys = None
+        cls.loop = None
+        cls.funcs_b4_loop = None
+        cls.funcs_in_loop = None
+        cls.funcs_b4_end  = None
+        cls.funcs_in_end  = None
         
-        # First let the integrator make sure everything is in order
-        cls._integrator(*cls._integrator_args)
+    
+    
+    def preload_solar_system(cls):
+        """
+        Method for preloading the solar system. Includes the following:
+            TODO: write what it includes.
+        """
+        # func, name, input_keys, static_params, output_key, 
+        # order, pre_loop = False, post_loop = False):
+        cls.set_time(0, timestep.constant_dt(2e6), timegen.time_years(1000))
+        cls.set_function(arena.make_arena_inf, 'arena generator', 
+                         [], (), 
+                         'cells and limits', 1, 
+                         pre_loop = True)
+        cls.set_function(ensgen.solar_system, 'ensemble generator', 
+                         ['cells and limits'], (), 
+                         'ensemble', 2, 
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 3,
+                         pre_loop = True)
+        cls.set_function(integrator.n_body_nice, 'integrator', 
+                         ['ensemble'], (), 
+                         'ensemble', 4)
+        cls.set_function(force.gravity, 'force 1', 
+                         ['affector position', 'affectee position',
+                          'affector mass', 'affectee mass'], (), 
+                         'force 1', 5)
+        cls.set_function(acceleration.single_force_acceleration, 
+                         'acceleration',
+                         ['ensemble', 'force 1'], (), 
+                         'acceleration', 6)
+        cls.set_function(solver.sym1, 'solver', 
+                         ['ensemble', 'acceleration'], (cls.time_step,), 
+                         'ensemble', 7)
+        cls.set_function(cls.save_data, 'saver', 
+                         ['ensemble'], (),
+                         'ensemble', 8)
+        cls.set_function(visual.simple_2d_anim, 'plotter', 
+                         ['ensemble', 'steps'], (), 
+                         'garbage', 9, post_loop = True)
+        cls.sort_functions()
+        if cls.verbose:
+            print('The Solar System has been preloaded. Please run the \
+              appropriate preload-function to load something else instead.')
+    
+    
+    def preload_n_body_nice(cls):
+        # TODO: FIX THIS
+        cls.set_time(0, timestep.constant_dt(2e6), timegen.time_years(200))
+        cls.set_function(arena.make_arena_inf, 'arena generator',
+                         [], (), 
+                         'cells and limits', 1,
+                         pre_loop = True)
+        cls.set_function(ensgen.n_body_nice, 'ensemble generator',
+                         ['cells and limits'], (),
+                         'ensemble', 2, 
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 3,
+                         pre_loop = True)
+        cls.set_function(integrator.n_body_nice, 'integrator',
+                         ['ensemble'], (),
+                         'ensemble', 4)
+        cls.set_function(force.gravity, 'force 1', 
+                         ['affector position', 'affectee position', 
+                          'affector mass', 'affectee mass'], (),
+                          'force', 5)
+        cls.set_function(acceleration.single_force_acceleration, 'accelerator',
+                         ['ensemble', 'force'], (),
+                         'acceleration', 6)
+        cls.set_function(solver.sym, 'solver',
+                         ['solver object', 'steps', 
+                          'ensemble', 'acceleration'], (cls.time_step,),
+                          'ensemble', 7)
+        cls.set_function(cls.save_data, 'saver', 
+                         ['ensemble'], (),
+                         'ensemble', 8, priority = 5)
+        cls.set_function(visual.simple_2d_anim, 'plotter', 
+                         ['ensemble', 'steps'], (), 
+                         'garbage', 9, post_loop = True)
+        cls.sort_functions()
+        if cls.verbose:
+            print('The Solar System has been preloaded. Please run the \
+              appropriate preload-function to load something else instead.')
+    
+    
+    def preload_lennard_jones(cls):
+        # func, name, input_keys, static_params, output_key, 
+        # order, pre_loop = False, post_loop = False):
+        cls.set_time(0, timestep.constant_dt(0.01), timegen.time_seconds(10))
+        cls.set_function(arena.make_arena, 'arena generator',
+                         [], (0.4, 0.6), 
+                         'cells and limits', 1,
+                         pre_loop = True)
+        cls.set_function(ensgen.lennard_jones_example, 'ensemble generator', 
+                         ['cells and limits'], (),
+                         'ensemble', 2,
+                         pre_loop = True)
+        cls.set_function(integrator.PIC_make_local_choords_once, 'integrator0',
+                         ['cells and limits'], (),
+                         'local cell choords', 3,
+                         pre_loop = True)
+        cls.set_function(integrator.PIC_get_non_periodic_box_indices,
+                         'integrator1', ['cells and limits'], (),
+                         'PIC cell indices', 4,
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 5,
+                         pre_loop = True)
+        cls.set_function(integrator.PIC_force_non_periodic, 'integrator',
+                         ['PIC cell indices', 'ensemble'], 
+                         (force.lennard_jones, ),
+                         'force', 6)
+        cls.set_function(acceleration.single_force_acceleration, 'accelerator',
+                         ['ensemble', 'force'], (),
+                         'acceleration', 7)
+        cls.set_function(solver.sym, 'solver', 
+                         ['solver object', 'steps', 
+                          'ensemble', 'acceleration'], (cls.time_step,), 
+                         'ensemble', 8)
+        cls.set_function(integrator.PIC_organize, 'integrator2',
+                         ['ensemble', 'cells and limits',
+                          'local cell choords'], (),
+                          'ensemble', 9)
+        cls.set_function(integrator.update_affector, 'affector update',
+                         ['ensemble'], (),
+                         'ensemble', 10)
+        cls.set_function(boundaries.edge_elastic, 'boundary',
+                         ['ensemble'], (1, [0,1,2], [-0.6, -0.6, -0.6], 
+                         [0.6, 0.6, 0.6]),
+                         'ensemble', 11)
+        cls.set_function(cls.save_data, 'saver', 
+                         ['ensemble'], (),
+                         'ensemble', 12, priority = 20)
+        cls.set_function(visual.simple_2d_anim, 'plotter', 
+                         ['ensemble', 'steps'], (), 
+                         'garbage', 13, post_loop = True)
+        cls.sort_functions()
+        if cls.verbose:
+            print('The Solar System has been preloaded. Please run the \
+              appropriate preload-function to load something else instead.')
         
-        # Then make an empty force list
-        cls.force = []
-        # Iterate over all forces
-        for k in np.arange(0, len(cls.force_dict_keys), 2):
-            fargs = []
-            # Get a tuple with all the variables needed for the forces
-            for i in cls._force_dict[cls.force_dict_keys[k+1]]:
-                fargs.append(cls.ensemble[i])
-            fargs = tuple(fargs)
-            force_func = cls._force_dict[cls.force_dict_keys[k]]
-            cls.force.append(force_func(*fargs)) # FORCES
-            
-        # Calculate the acceleration
-        cls.ensemble['acceleration'] = cls._acceleration(cls.ensemble['mass'],
-                                                    *tuple(cls.force) +
-                                                    cls._acceleration_args)
+        print('Ready to go!')
         
-        # Then use the acceleration to iterate one step.
-        cls._solver(cls.ensemble, *cls._solver_args)
-        cls._iteration_steps += 1
-        cls._time_now += cls.time_step
+    def preload_lennard_jones_old(cls):
+        # func, name, input_keys, static_params, output_key, 
+        # order, pre_loop = False, post_loop = False):
+        cls.set_time(0, timestep.constant_dt(0.1), timegen.time_seconds(100))
+        cls.set_function(arena.make_arena, 'arena generator',
+                         [], (0.4, 0.6), 
+                         'cells and limits', 1,
+                         pre_loop = True)
+        cls.set_function(ensgen.lennard_jones_example, 'ensemble generator', 
+                         ['cells and limits'], (),
+                         'ensemble', 2,
+                         pre_loop = True)
+        cls.set_function(integrator.PIC_make_local_choords_once, 'integrator0',
+                         ['cells and limits'], (),
+                         'local cell choords', 3,
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 4,
+                         pre_loop = True)
+        cls.set_function(integrator.PIC_force, 'integrator',
+                         ['ensemble'], (force.lennard_jones, ),
+                         'force', 5)
+        cls.set_function(acceleration.single_force_acceleration, 'accelerator',
+                         ['ensemble', 'force'], (),
+                         'acceleration', 6)
+        cls.set_function(solver.sym, 'solver', 
+                         ['solver object', 'steps', 
+                          'ensemble', 'acceleration'], (cls.time_step,), 
+                         'ensemble', 7)
+        cls.set_function(integrator.PIC_organize, 'integrator1',
+                         ['ensemble', 'cells and limits',
+                          'local cell choords'], (),
+                          'ensemble', 8)
+        cls.set_function(integrator.update_affector, 'affector update',
+                         ['ensemble'], (),
+                         'ensemble', 9)
+        cls.set_function(boundaries.edge_elastic, 'boundary',
+                         ['ensemble'], (1, [0,1,2], [-0.6, -0.6, -0.6], 
+                         [0.6, 0.6, 0.6]),
+                         'ensemble', 10)
+        cls.set_function(cls.save_data, 'saver', 
+                         ['ensemble'], (),
+                         'ensemble', 11, priority = 5)
+        cls.set_function(visual.simple_2d_anim, 'plotter', 
+                         ['ensemble', 'steps'], (), 
+                         'garbage', 12, post_loop = True)
+        cls.sort_functions()
+        if cls.verbose:
+            print('The Solar System has been preloaded. Please run the \
+              appropriate preload-function to load something else instead.')
+        
+        print('Ready to go!')
+        
+    
+    
+    def preload_particle_in_B_field(cls):
+        cls.set_time(0, timestep.constant_dt(0.001), 
+                     time_end = timegen.time_seconds(20))
+        cls.set_function(arena.make_arena_inf, 'arena generator',
+                         [], (),
+                         'cells and limits', 1,
+                         pre_loop = True)
+        cls.set_function(ensgen.particle_in_B, 'ensemble generator',
+                         ['cells and limits'], (),
+                         'ensemble', 2,
+                         pre_loop = True)
+        cls.set_function(force.uniform_B, 'field generator 1',
+                         [], (1, 2),
+                         'B-field', 3,
+                         pre_loop = True)
+        cls.set_function(force.uniform_E, 'field generator 2',
+                         [], (0, 0),
+                         'E-field', 4,
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 5,
+                         pre_loop = True)
+        cls.set_function(force.lorentz_force, 'force function',
+                         ['E-field', 'B-field', 'charge', 'velocity'], (),
+                         'force', 6,
+                         priority = 1)
+        cls.set_function(acceleration.single_force_acceleration, 'accelerator',
+                         ['ensemble', 'force'], (),
+                         'acceleration', 7,
+                         priority = 1)
+        cls.set_function(solver.sym, 'solver',
+                         ['solver object', 'steps', 
+                          'ensemble', 'acceleration'], (cls.time_step, ),
+                         'ensemble', 8,
+                         priority = 1)
+        cls.set_function(cls.save_data, 'saver',
+                         ['ensemble'], (),
+                         'ensemble', 9,
+                         priority = 100)
+        cls.set_function(visual.simple_2d_anim, 'plotter',
+                         ['ensemble', 'steps'], (),
+                         'garbage', 10, post_loop = True)
+        cls.sort_functions()
+    
+    
+    def preload_two_body_problem(cls):
+        cls.set_time(0, timestep.constant_dt(0.001), timegen.time_seconds(20))
+        cls.set_function(arena.make_arena_inf, 'arena generator',
+                         [], (),
+                         'cells and limits', 1,
+                         pre_loop = True)
+        cls.set_function(ensgen.two_body_problem, 'ensemble generator',
+                         ['cells and limits'], (),
+                         'ensemble', 2,
+                         pre_loop = True)
+        cls.set_function(solver.sym_solver_init, 'pre-solver',
+                         [], (1,),
+                         'solver object', 5,
+                         pre_loop = True)
+        cls.set_function(force.gravity, 'force function',
+                         ['E-field', 'B-field', 'charge', 'velocity'], (),
+                         'force', 6,
+                         priority = 1)
+        cls.set_function(acceleration.single_force_acceleration, 'accelerator',
+                         ['ensemble', 'force'], (),
+                         'acceleration', 7,
+                         priority = 1)
+        cls.set_function(solver.sym, 'solver',
+                         ['solver object', 'steps', 
+                          'ensemble', 'acceleration'], (cls.time_step,),
+                         'ensemble', 8,
+                         priority = 1)
+        cls.set_function(cls.save_data, 'saver',
+                         ['ensemble'], (),
+                         'ensemble', 9,
+                         priority = 100)
+        cls.set_function(visual.simple_2d_anim, 'plotter',
+                         ['ensemble', 'steps'], (),
+                         'garbage', 10, post_loop = True)
+        cls.sort_functions()
+        
     
     
     def run(cls):
-        while cls._time_now < cls.time_end:
-            cls.step()
-            cls.record_data('position', 'position data')
-        cls.set_plot_routine(visual.simple_2d_anim, (cls._iteration_steps,))
-        print(cls._plot_args)
-        print(type(cls._plot_args))
-        cls.plot_output = cls._plot_func(cls.ensemble, *cls._plot_args)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        cls._preamble()
+        cls._loop()
+        cls._postprocessing()
+        return cls.data
+    
+    
+    def set_function(cls, func, name, input_keys, static_params, output_key, 
+                     order, priority = 1, pre_loop = False, post_loop = False):
+        if pre_loop and post_loop:
+            raise('wtf')
+        
+        ensemble_keys = []
+        data_keys = []
+        for k in input_keys:
+            if k in cls.definite_ensemble_keys:
+                ensemble_keys.append(k)
+            else:
+                data_keys.append(k)
+        
+        
+        cls.functions[name]                  = cls._update(func, static_params)
+        cls.functions[name + cls.input_str]  = data_keys
+        cls.functions[name + cls.ens_str]    = ensemble_keys
+        cls.functions[name + cls.output_str] = output_key
+        cls.functions[name + cls.order_str]  = order
+        cls.functions[name + cls.loop_str]   = -pre_loop + post_loop
+        cls.functions[name + cls.prio_str]   = priority
+        
+        if name == 'pre-solver':
+            cls.order = static_params[0]
+        
+        
+    def set_time(cls, time_start, time_step, time_end, max_steps = 100000):
+        cls.time_start = time_start
+        cls.time_step  = time_step
+        cls.time_end   = time_end
+        cls._time_now  = time_start
+        cls.step_max   = max_steps
+    
+    
+    def save_data(cls, ensemble,
+                  key_ensemble = 'affectee position',
+                  key_save = 'affectee position data'):
+        data_temp = np.empty((0,3), float)
+        cnt = 0
+        for i in ensemble[key_ensemble].flatten():
+            #print(cnt)
+            cnt += 1
+            data_temp = np.append(data_temp, i, axis=0)
+        ensemble[key_save] = np.append(ensemble[key_save],
+                                np.reshape(data_temp,
+                                          (ensemble['number of objects'],
+                                           3,1)), axis = 2)
+        return ensemble
+        
+    
+    
+    def sort_functions(cls):
+        funcs         = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.input_str not in k\
+                         if cls.output_str not in k\
+                         if cls.order_str not in k\
+                         if cls.loop_str not in k\
+                         if cls.ens_str not in k\
+                         if cls.prio_str not in k]
+        input_keys    = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.input_str in k]
+        ensemble_keys = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.ens_str in k]
+        output_keys   = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.output_str in k]
+        loop_status   = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.loop_str in k]
+        order         = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.order_str in k]
+        priority      = [cls.functions[k] for k in cls.functions.keys() \
+                         if cls.prio_str in k]
+        
+        indx = np.array(order).argsort()
+        cls.funcs = np.empty(indx.size, object)
+        cls.output_keys = np.empty(indx.size, object)
+        cls.input_keys = np.empty(indx.size, object)
+        cls.ensemble_keys = np.empty(indx.size, object)
+        cls.priority = np.array(priority)[indx]
+        for srt_in, cnt_in in zip(indx, range(indx.size)):
+            cls.funcs[cnt_in] = funcs[srt_in]
+            cls.output_keys[cnt_in] = output_keys[srt_in]
+            cls.input_keys[cnt_in] = input_keys[srt_in]
+            cls.ensemble_keys[cnt_in] = ensemble_keys[srt_in]
+        cls.loop = np.array(loop_status)[indx]
+        cls.funcs_b4_loop = sum(cls.loop == -1)
+        cls.funcs_in_loop = sum(cls.loop == 0)
+        cls.funcs_b4_end  = cls.funcs_in_loop + cls.funcs_b4_loop
+        cls.funcs_in_end  = sum(cls.loop == 1)
+        
+            
+        
+        
+        
+    
+    
+    
+    
+# =============================================================================
+#     def set_num_functions(cls, num):
+#         cls.functions         = np.resize(cls.functions, num)
+#         cls.func_designations = np.resize(cls.func_designations, num)
+#         cls.output_keys       = np.resize(cls.outer_keys, num)
+#         
+#         if cls.verbose:
+#             print('Your functions now are as follows:')
+#             print('functions:')
+#             print(cls.functions)
+#             print()
+#             print('designations:')
+#             print(cls.func_designations)
+#             print()
+#             print("Please be aware that there are duplicates if the array is \
+#                   longer than before, and deletions if it is shorter.")
+# =============================================================================
+            
+    
+    
+    
