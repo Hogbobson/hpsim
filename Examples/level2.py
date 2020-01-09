@@ -13,7 +13,7 @@ from hpsim import timegen
 
 plt.close("all")
 
-e = main.main(ensemble_generator = ensgen.solar_system, 
+e = main.main(ensemble_generator = ensgen.random_solar_system, 
                     plot_func = visual.simple_2d_anim,
                     time_end = timegen.time_years(1))
 

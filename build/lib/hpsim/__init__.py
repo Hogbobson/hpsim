@@ -6,7 +6,7 @@ Created on Mon May 27 15:43:40 2019
 @author: hogbobson
 """
 
-#import sonic
+from . import main
 #import ensgen
 #import miscfuncs
 #import timegen

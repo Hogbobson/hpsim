@@ -14,3 +14,22 @@ Got the package to function. It was a good day.
 v0.3.3:
 Messed up all the files and updating the version # was the way forward.
 This procedure will seem embarrassing in five years.
+
+v0.4.0
+Did things, but I forgot what. It probably has something to do with the restructuring of main, but I'll write more about that in v0.5.0
+
+v0.5.0
+Changed main.py to allow for a \emph{variable!} amount of variables in the function you yourself (or I) supply the various steps. Like matplotlib.funcanimation. It feels like a grand milestone.
+
+v0.5.1
+Succeeded in making a particle generator that doesn't deal with a central power, like the sun. While that wasn't too difficult, it was difficult implementing that it had certain variables only sometimes.
+TODO: make 'certain variables' customizable, so the user can input his/her own.
+
+v0.5.2
+Dissatisfied with the deep-nested callings of functions throughout the programme, I changed it so it's now a more flat structure. Should make it easier to customize.
+
+
+v0.8.0
+Definitely skipped a few version numbers. Last time I uploaded there was still a set structure. Hpsim now allows for any function, with any input, and any output. More description to come. TODO: Better visualization.
+
+

@@ -1,27 +1,41 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue May 28 19:29:19 2019
-
-@author: hogbobson
+solver.py contains everything related to solvers, that is, integrators... they
+make time move forward, okay!
 """
-from hpsim.miscfuncs import sym_kick, sym_drift
 
-def sym1(ensemble, dt, forces):
-    ensemble = sym_kick(ensemble, dt, 1, forces)
+
+def sym1(ensemble, dt):
+    ensemble = sym_kick(ensemble, dt, 1)
     ensemble = sym_drift(ensemble, dt, 1)
     return ensemble
-    
-def sym2(ensemble, dt, forces):
-    ensemble = sym_kick(ensemble, dt, 0.5, forces)
+
+
+def sym2(ensemble, dt):
+    ensemble = sym_kick(ensemble, dt, 0.5)
     ensemble = sym_drift(ensemble, dt, 1)
-    ensemble = sym_kick(ensemble, dt, 0.5, forces)
+    ensemble = sym_kick(ensemble, dt, 0.5)
     return ensemble
 
-def sym3(ensemble, dt, forces):
-    pass
+# TODO: SYM3
+# TODO: SYM4
+# TODO: RK
 
-#Figure out how to make these two v^ not awful.
 
-def sym4(ensemble, dt, forces):
-    pass
+
+
+
+def sym_kick(ensemble, dt, d):
+    ensemble['velocity'] += d * dt * ensemble['acceleration']
+    return ensemble
+
+
+def sym_drift(ensemble, dt, c):
+    ensemble['position'] += c * dt * ensemble['velocity']
+    return ensemble
+
+
+
+
+
